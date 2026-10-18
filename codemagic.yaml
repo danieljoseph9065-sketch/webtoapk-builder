@@ -1,0 +1,29 @@
+workflows:
+  android-release:
+    name: Build Android APK
+    max_build_duration: 30
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      groups:
+        - app_vars
+    scripts:
+      - name: Set up dependencies
+        script: |
+          flutter packages get
+      - name: Build APK with dynamic parameters
+        script: |
+          APP_NAME="${CUSTOM_APP_NAME:-Web to App}"
+          TARGET_URL="${CUSTOM_TARGET_URL:-https://google.com}"
+          ENABLE_AUTH="${CUSTOM_ENABLE_AUTH:-false}"
+          
+          flutter build apk --release \
+            --dart-define=APP_NAME="$APP_NAME" \
+            --dart-define=TARGET_URL="$TARGET_URL" \
+            --dart-define=ENABLE_AUTH="$ENABLE_AUTH"
+    artifacts:
+      - build/**/outputs/**/*.apk
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
