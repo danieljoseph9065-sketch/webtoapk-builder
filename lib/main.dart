@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'app_config.dart';
@@ -15,7 +16,7 @@ void main() async {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e) {
-    debugPrint("Firebase init optional: $e");
+    debugPrint("Firebase init: $e");
   }
   runApp(const DynamicWebApp());
 }
@@ -34,7 +35,6 @@ class DynamicWebApp extends StatelessWidget {
         appBarTheme: AppBarTheme(
           backgroundColor: AppConfig.primaryColor,
           foregroundColor: Colors.white,
-          elevation: 2,
         ),
       ),
       home: const SplashScreen(),
@@ -71,24 +71,17 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppConfig.primaryColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.language, size: 70, color: AppConfig.primaryColor),
-            ),
-            const SizedBox(height: 24),
+            Icon(Icons.language, size: 80, color: AppConfig.primaryColor),
+            const SizedBox(height: 20),
             Text(
               AppConfig.appName,
               style: TextStyle(
-                fontSize: 26,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: AppConfig.primaryColor,
               ),
             ),
-            const SizedBox(height: 36),
+            const SizedBox(height: 30),
             CircularProgressIndicator(color: AppConfig.primaryColor),
           ],
         ),
@@ -113,26 +106,38 @@ class _MainWebScreenState extends State<MainWebScreen> {
   @override
   void initState() {
     super.initState();
-    _parseNavItems();
-    _initWebView();
+    _parseNav();
+    _initWeb();
   }
 
-  void _parseNavItems() {
+  void _parseNav() {
     if (AppConfig.showBottomNav && AppConfig.bottomNavItems.isNotEmpty) {
-      _navItemsList = AppConfig.bottomNavItems
-          .split(',')
-          .map((e) => e.trim().toLowerCase())
-          .toList();
+      _navItemsList = AppConfig.bottomNavItems.split(',').map((e) => e.trim().toLowerCase()).toList();
     }
   }
 
-  void _initWebView() {
+  void _initWeb() {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..enableZoom(AppConfig.enableZoom)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) => setState(() => _isLoading = true),
           onPageFinished: (_) => setState(() => _isLoading = false),
+          onNavigationRequest: (NavigationRequest request) async {
+            final uri = Uri.parse(request.url);
+            // Handle external schemes (WhatsApp, Mail, Tel, UPI, PlayStore)
+            if (!['http', 'https'].contains(uri.scheme) ||
+                request.url.contains('wa.me') ||
+                request.url.contains('api.whatsapp.com') ||
+                request.url.contains('play.google.com')) {
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                return NavigationDecision.prevent;
+              }
+            }
+            return NavigationDecision.navigate;
+          },
         ),
       )
       ..loadRequest(Uri.parse(AppConfig.targetUrl));
@@ -140,31 +145,22 @@ class _MainWebScreenState extends State<MainWebScreen> {
 
   IconData _getFabIcon() {
     switch (AppConfig.fabIconType.toLowerCase()) {
-      case 'call':
-        return Icons.phone;
-      case 'share':
-        return Icons.share;
-      case 'refresh':
-        return Icons.refresh;
+      case 'call': return Icons.phone;
+      case 'share': return Icons.share;
+      case 'refresh': return Icons.refresh;
       case 'chat':
-      default:
-        return Icons.chat;
+      default: return Icons.chat;
     }
   }
 
   BottomNavigationBarItem _buildNavItem(String type) {
     switch (type) {
-      case 'back':
-        return const BottomNavigationBarItem(icon: Icon(Icons.arrow_back), label: 'Back');
-      case 'forward':
-        return const BottomNavigationBarItem(icon: Icon(Icons.arrow_forward), label: 'Forward');
-      case 'reload':
-        return const BottomNavigationBarItem(icon: Icon(Icons.refresh), label: 'Reload');
-      case 'share':
-        return const BottomNavigationBarItem(icon: Icon(Icons.share), label: 'Share');
+      case 'back': return const BottomNavigationBarItem(icon: Icon(Icons.arrow_back), label: 'Back');
+      case 'forward': return const BottomNavigationBarItem(icon: Icon(Icons.arrow_forward), label: 'Forward');
+      case 'reload': return const BottomNavigationBarItem(icon: Icon(Icons.refresh), label: 'Reload');
+      case 'share': return const BottomNavigationBarItem(icon: Icon(Icons.share), label: 'Share');
       case 'home':
-      default:
-        return const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home');
+      default: return const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home');
     }
   }
 
@@ -179,6 +175,22 @@ class _MainWebScreenState extends State<MainWebScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Widget bodyContent = Stack(
+      children: [
+        WebViewWidget(controller: _controller),
+        if (_isLoading)
+          LinearProgressIndicator(color: AppConfig.primaryColor, backgroundColor: Colors.transparent),
+      ],
+    );
+
+    if (AppConfig.enablePullToRefresh) {
+      bodyContent = RefreshIndicator(
+        color: AppConfig.primaryColor,
+        onRefresh: () async => _controller.reload(),
+        child: bodyContent,
+      );
+    }
+
     return WillPopScope(
       onWillPop: () async {
         if (await _controller.canGoBack()) {
@@ -192,83 +204,42 @@ class _MainWebScreenState extends State<MainWebScreen> {
             ? AppBar(
                 title: Text(AppConfig.appName),
                 actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () => _controller.reload(),
-                  ),
+                  IconButton(icon: const Icon(Icons.refresh), onPressed: () => _controller.reload()),
                 ],
               )
             : null,
-        // Professional Side Navigation Drawer
         drawer: AppConfig.showDrawer
             ? Drawer(
                 child: ListView(
-                  padding: EdgeInsets.zero,
                   children: [
                     DrawerHeader(
                       decoration: BoxDecoration(color: AppConfig.primaryColor),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircleAvatar(
-                            backgroundColor: Colors.white,
-                            radius: 30,
-                            child: Icon(Icons.language, size: 36),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            AppConfig.appName,
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                      child: Center(
+                        child: Text(AppConfig.appName, style: const TextStyle(color: Colors.white, fontSize: 20)),
                       ),
                     ),
                     ListTile(
                       leading: const Icon(Icons.home),
-                      title: const Text('Home Page'),
+                      title: const Text('Home'),
                       onTap: () {
                         Navigator.pop(context);
                         _controller.loadRequest(Uri.parse(AppConfig.targetUrl));
                       },
                     ),
-                    ListTile(
-                      leading: const Icon(Icons.refresh),
-                      title: const Text('Reload Webview'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _controller.reload();
-                      },
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.exit_to_app),
-                      title: const Text('Exit App'),
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
                   ],
                 ),
               )
             : null,
-        body: SafeArea(
-          child: Stack(
-            children: [
-              WebViewWidget(controller: _controller),
-              if (_isLoading)
-                LinearProgressIndicator(
-                  color: AppConfig.primaryColor,
-                  backgroundColor: Colors.transparent,
-                ),
-            ],
-          ),
-        ),
-        // Customizable Floating Action Button
+        body: SafeArea(child: bodyContent),
         floatingActionButton: AppConfig.showFab
             ? FloatingActionButton(
                 backgroundColor: AppConfig.primaryColor,
-                onPressed: () {
+                onPressed: () async {
                   if (AppConfig.fabActionUrl.isNotEmpty) {
-                    _controller.loadRequest(Uri.parse(AppConfig.fabActionUrl));
+                    final uri = Uri.parse(AppConfig.fabActionUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
                   } else {
                     _controller.reload();
                   }
@@ -276,7 +247,6 @@ class _MainWebScreenState extends State<MainWebScreen> {
                 child: Icon(_getFabIcon(), color: Colors.white),
               )
             : null,
-        // Fully Customizable Bottom Navigation Bar
         bottomNavigationBar: (AppConfig.showBottomNav && _navItemsList.isNotEmpty)
             ? BottomNavigationBar(
                 currentIndex: _currentNavIndex >= _navItemsList.length ? 0 : _currentNavIndex,
