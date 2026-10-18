@@ -8,45 +8,51 @@ workflows:
       groups:
         - app_vars
     scripts:
-      - name: Set up dependencies
+      - name: Inject Selected Permissions Only
+        script: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          PERMS=""
+          
+          if [ "$REQ_CAMERA" = "true" ]; then
+            PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.CAMERA\"/>"
+          fi
+          if [ "$REQ_LOCATION" = "true" ]; then
+            PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>"
+          fi
+          if [ "$REQ_STORAGE" = "true" ]; then
+            PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>\n    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
+          fi
+          if [ "$REQ_MIC" = "true" ]; then
+            PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
+          fi
+          if [ "$REQ_NOTIFICATIONS" = "true" ]; then
+            PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
+          fi
+          
+          # Replace placeholder with selected permissions
+          sed -i '' "s|<!-- DYNAMIC_PERMISSIONS_PLACEHOLDER -->|$PERMS|g" $MANIFEST || sed -i "s|<!-- DYNAMIC_PERMISSIONS_PLACEHOLDER -->|$PERMS|g" $MANIFEST
+
+      - name: Fetch Dependencies
         script: |
           flutter packages get
-      - name: Build APK with dynamic parameters
+
+      - name: Build APK with Dynamic Controls
         script: |
-          APP_NAME="${CUSTOM_APP_NAME:-Web to App}"
-          TARGET_URL="${CUSTOM_TARGET_URL:-https://google.com}"
-          THEME_COLOR="${CUSTOM_THEME_COLOR:-4F46E5}"
-          SPLASH_BG_COLOR="${CUSTOM_SPLASH_BG:-FFFFFF}"
-          SPLASH_DURATION="${CUSTOM_SPLASH_DURATION:-2}"
-          SHOW_APPBAR="${CUSTOM_SHOW_APPBAR:-true}"
-          SHOW_DRAWER="${CUSTOM_SHOW_DRAWER:-true}"
-          SHOW_BOTTOM_NAV="${CUSTOM_SHOW_BOTTOM_NAV:-false}"
-          BOTTOM_NAV_ITEMS="${CUSTOM_BOTTOM_NAV_ITEMS:-home,back,forward,reload}"
-          SHOW_FAB="${CUSTOM_SHOW_FAB:-false}"
-          FAB_ACTION_URL="${CUSTOM_FAB_URL:-}"
-          FAB_ICON_TYPE="${CUSTOM_FAB_ICON:-chat}"
-          ENABLE_LOCATION="${CUSTOM_ENABLE_LOCATION:-true}"
-          ENABLE_CAMERA="${CUSTOM_ENABLE_CAMERA:-true}"
-          ENABLE_STORAGE="${CUSTOM_ENABLE_STORAGE:-true}"
-          ENABLE_MIC="${CUSTOM_ENABLE_MIC:-false}"
-          
           flutter build apk --release \
-            --dart-define=APP_NAME="$APP_NAME" \
-            --dart-define=TARGET_URL="$TARGET_URL" \
-            --dart-define=THEME_COLOR="$THEME_COLOR" \
-            --dart-define=SPLASH_BG_COLOR="$SPLASH_BG_COLOR" \
-            --dart-define=SPLASH_DURATION="$SPLASH_DURATION" \
-            --dart-define=SHOW_APPBAR="$SHOW_APPBAR" \
-            --dart-define=SHOW_DRAWER="$SHOW_DRAWER" \
-            --dart-define=SHOW_BOTTOM_NAV="$SHOW_BOTTOM_NAV" \
-            --dart-define=BOTTOM_NAV_ITEMS="$BOTTOM_NAV_ITEMS" \
-            --dart-define=SHOW_FAB="$SHOW_FAB" \
-            --dart-define=FAB_ACTION_URL="$FAB_ACTION_URL" \
-            --dart-define=FAB_ICON_TYPE="$FAB_ICON_TYPE" \
-            --dart-define=ENABLE_LOCATION="$ENABLE_LOCATION" \
-            --dart-define=ENABLE_CAMERA="$ENABLE_CAMERA" \
-            --dart-define=ENABLE_STORAGE="$ENABLE_STORAGE" \
-            --dart-define=ENABLE_MIC="$ENABLE_MIC"
+            --dart-define=APP_NAME="${CUSTOM_APP_NAME:-Web to App}" \
+            --dart-define=TARGET_URL="${CUSTOM_TARGET_URL:-https://google.com}" \
+            --dart-define=THEME_COLOR="${CUSTOM_THEME_COLOR:-4F46E5}" \
+            --dart-define=SPLASH_BG_COLOR="${CUSTOM_SPLASH_BG:-FFFFFF}" \
+            --dart-define=SPLASH_DURATION="${CUSTOM_SPLASH_DURATION:-2}" \
+            --dart-define=ENABLE_ZOOM="${CUSTOM_ENABLE_ZOOM:-true}" \
+            --dart-define=ENABLE_PULL_TO_REFRESH="${CUSTOM_ENABLE_REFRESH:-true}" \
+            --dart-define=SHOW_APPBAR="${CUSTOM_SHOW_APPBAR:-false}" \
+            --dart-define=SHOW_DRAWER="${CUSTOM_SHOW_DRAWER:-false}" \
+            --dart-define=SHOW_BOTTOM_NAV="${CUSTOM_SHOW_BOTTOM_NAV:-false}" \
+            --dart-define=BOTTOM_NAV_ITEMS="${CUSTOM_BOTTOM_NAV_ITEMS:-home,back,forward,reload}" \
+            --dart-define=SHOW_FAB="${CUSTOM_SHOW_FAB:-false}" \
+            --dart-define=FAB_ACTION_URL="${CUSTOM_FAB_URL:-}" \
+            --dart-define=FAB_ICON_TYPE="${CUSTOM_FAB_ICON:-chat}"
     artifacts:
       - build/**/outputs/**/*.apk
     publishing:
