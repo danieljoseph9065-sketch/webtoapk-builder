@@ -18,11 +18,17 @@ workflows:
           THEME_COLOR="${CUSTOM_THEME_COLOR:-4F46E5}"
           SPLASH_BG_COLOR="${CUSTOM_SPLASH_BG:-FFFFFF}"
           SPLASH_DURATION="${CUSTOM_SPLASH_DURATION:-2}"
-          SHOW_APPBAR="${CUSTOM_SHOW_APPBAR:-false}"
+          SHOW_APPBAR="${CUSTOM_SHOW_APPBAR:-true}"
+          SHOW_DRAWER="${CUSTOM_SHOW_DRAWER:-true}"
           SHOW_BOTTOM_NAV="${CUSTOM_SHOW_BOTTOM_NAV:-false}"
+          BOTTOM_NAV_ITEMS="${CUSTOM_BOTTOM_NAV_ITEMS:-home,back,forward,reload}"
           SHOW_FAB="${CUSTOM_SHOW_FAB:-false}"
           FAB_ACTION_URL="${CUSTOM_FAB_URL:-}"
-          ENABLE_AUTH="${CUSTOM_ENABLE_AUTH:-false}"
+          FAB_ICON_TYPE="${CUSTOM_FAB_ICON:-chat}"
+          ENABLE_LOCATION="${CUSTOM_ENABLE_LOCATION:-true}"
+          ENABLE_CAMERA="${CUSTOM_ENABLE_CAMERA:-true}"
+          ENABLE_STORAGE="${CUSTOM_ENABLE_STORAGE:-true}"
+          ENABLE_MIC="${CUSTOM_ENABLE_MIC:-false}"
           
           flutter build apk --release \
             --dart-define=APP_NAME="$APP_NAME" \
@@ -31,10 +37,16 @@ workflows:
             --dart-define=SPLASH_BG_COLOR="$SPLASH_BG_COLOR" \
             --dart-define=SPLASH_DURATION="$SPLASH_DURATION" \
             --dart-define=SHOW_APPBAR="$SHOW_APPBAR" \
+            --dart-define=SHOW_DRAWER="$SHOW_DRAWER" \
             --dart-define=SHOW_BOTTOM_NAV="$SHOW_BOTTOM_NAV" \
+            --dart-define=BOTTOM_NAV_ITEMS="$BOTTOM_NAV_ITEMS" \
             --dart-define=SHOW_FAB="$SHOW_FAB" \
             --dart-define=FAB_ACTION_URL="$FAB_ACTION_URL" \
-            --dart-define=ENABLE_AUTH="$ENABLE_AUTH"
+            --dart-define=FAB_ICON_TYPE="$FAB_ICON_TYPE" \
+            --dart-define=ENABLE_LOCATION="$ENABLE_LOCATION" \
+            --dart-define=ENABLE_CAMERA="$ENABLE_CAMERA" \
+            --dart-define=ENABLE_STORAGE="$ENABLE_STORAGE" \
+            --dart-define=ENABLE_MIC="$ENABLE_MIC"
     artifacts:
       - build/**/outputs/**/*.apk
     publishing:
