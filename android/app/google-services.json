@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "969279503155",
+    "project_id": "web2app-converter-c9c68",
+    "storage_bucket": "web2app-converter-c9c68.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:969279503155:android:4d9603da4bbd1c60f79c46",
+        "android_client_info": {
+          "package_name": "com.appbuilder.webtoappbuilder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAViKwkElfPlO-btG_23nZtlntm0BXE3hE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
