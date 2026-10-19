@@ -8,7 +8,7 @@ workflows:
       groups:
         - app_vars
     scripts:
-      - name: Set up Android permissions dynamically
+      - name: Inject Selected Permissions Only
         script: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
@@ -17,16 +17,16 @@ workflows:
             [ "$REQ_LOCATION" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>"
             [ "$REQ_STORAGE" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>\n    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
             [ "$REQ_MIC" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
+            [ "$REQ_NOTIFICATIONS" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
             
-            # Safe replacement for Linux runner
             sed -i "s|<!-- DYNAMIC_PERMISSIONS_PLACEHOLDER -->|$PERMS|g" "$MANIFEST" || true
           fi
 
-      - name: Get Flutter packages
+      - name: Fetch Dependencies
         script: |
           flutter packages get
 
-      - name: Build Android Release APK
+      - name: Build APK with Dynamic Controls
         script: |
           flutter build apk --release \
             --dart-define=APP_NAME="${CUSTOM_APP_NAME:-Web to App}" \
