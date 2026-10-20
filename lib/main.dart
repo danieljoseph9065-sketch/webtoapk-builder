@@ -1,41 +1,37 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:share_plus/share_plus.dart';
 import 'app_config.dart';
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-}
-
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  } catch (e) {
-    debugPrint("Firebase init: $e");
-  }
-  runApp(const DynamicWebApp());
+  runApp(const MyApp());
 }
 
-class DynamicWebApp extends StatelessWidget {
-  const DynamicWebApp({super.key});
+Color parseColor(String hex) {
+  try {
+    String cleanHex = hex.replaceAll("#", "");
+    if (cleanHex.length == 6) cleanHex = "FF$cleanHex";
+    return Color(int.parse(cleanHex, radix: 16));
+  } catch (e) {
+    return const Color(0xFF4F46E5);
+  }
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final themeColor = parseColor(AppConfig.themeColor);
     return MaterialApp(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: themeColor),
         useMaterial3: true,
-        primaryColor: AppConfig.primaryColor,
-        appBarTheme: AppBarTheme(
-          backgroundColor: AppConfig.primaryColor,
-          foregroundColor: Colors.white,
-        ),
       ),
       home: const SplashScreen(),
     );
@@ -53,36 +49,42 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(Duration(seconds: AppConfig.splashDurationSec), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MainWebScreen()),
-        );
-      }
+    Timer(Duration(seconds: AppConfig.splashDuration), () {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const WebScreen()),
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final splashBg = parseColor(AppConfig.splashBg);
     return Scaffold(
-      backgroundColor: AppConfig.splashBgColor,
+      backgroundColor: splashBg,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.language, size: 80, color: AppConfig.primaryColor),
-            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.public, size: 64, color: Colors.white),
+            ),
+            const SizedBox(height: 24),
             Text(
               AppConfig.appName,
-              style: TextStyle(
-                fontSize: 24,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
-                color: AppConfig.primaryColor,
+                letterSpacing: 0.5,
               ),
             ),
-            const SizedBox(height: 30),
-            CircularProgressIndicator(color: AppConfig.primaryColor),
+            const SizedBox(height: 32),
+            const CircularProgressIndicator(color: Colors.white70),
           ],
         ),
       ),
@@ -90,51 +92,32 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-class MainWebScreen extends StatefulWidget {
-  const MainWebScreen({super.key});
+class WebScreen extends StatefulWidget {
+  const WebScreen({super.key});
 
   @override
-  State<MainWebScreen> createState() => _MainWebScreenState();
+  State<WebScreen> createState() => _WebScreenState();
 }
 
-class _MainWebScreenState extends State<MainWebScreen> {
+class _WebScreenState extends State<WebScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
-  int _currentNavIndex = 0;
-  List<String> _navItemsList = [];
 
   @override
   void initState() {
     super.initState();
-    _parseNav();
-    _initWeb();
-  }
-
-  void _parseNav() {
-    if (AppConfig.showBottomNav && AppConfig.bottomNavItems.isNotEmpty) {
-      _navItemsList = AppConfig.bottomNavItems.split(',').map((e) => e.trim().toLowerCase()).toList();
-    }
-  }
-
-  void _initWeb() {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..enableZoom(AppConfig.enableZoom)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() => _isLoading = true),
-          onPageFinished: (_) => setState(() => _isLoading = false),
-          onNavigationRequest: (NavigationRequest request) async {
+          onPageStarted: (String url) => setState(() => _isLoading = true),
+          onPageFinished: (String url) => setState(() => _isLoading = false),
+          onNavigationRequest: (NavigationRequest request) {
             final uri = Uri.parse(request.url);
-            // Handle external schemes (WhatsApp, Mail, Tel, UPI, PlayStore)
-            if (!['http', 'https'].contains(uri.scheme) ||
-                request.url.contains('wa.me') ||
-                request.url.contains('api.whatsapp.com') ||
-                request.url.contains('play.google.com')) {
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-                return NavigationDecision.prevent;
-              }
+            if (uri.scheme == 'tel' || uri.scheme == 'mailto' || uri.scheme == 'whatsapp') {
+              launchUrl(uri, mode: LaunchMode.externalApplication);
+              return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
           },
@@ -143,53 +126,20 @@ class _MainWebScreenState extends State<MainWebScreen> {
       ..loadRequest(Uri.parse(AppConfig.targetUrl));
   }
 
-  IconData _getFabIcon() {
-    switch (AppConfig.fabIconType.toLowerCase()) {
-      case 'call': return Icons.phone;
-      case 'share': return Icons.share;
-      case 'refresh': return Icons.refresh;
-      case 'chat':
-      default: return Icons.chat;
+  void _triggerFabAction() async {
+    if (AppConfig.fabUrl.isNotEmpty) {
+      final uri = Uri.parse(AppConfig.fabUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } else {
+      _controller.reload();
     }
-  }
-
-  BottomNavigationBarItem _buildNavItem(String type) {
-    switch (type) {
-      case 'back': return const BottomNavigationBarItem(icon: Icon(Icons.arrow_back), label: 'Back');
-      case 'forward': return const BottomNavigationBarItem(icon: Icon(Icons.arrow_forward), label: 'Forward');
-      case 'reload': return const BottomNavigationBarItem(icon: Icon(Icons.refresh), label: 'Reload');
-      case 'share': return const BottomNavigationBarItem(icon: Icon(Icons.share), label: 'Share');
-      case 'home':
-      default: return const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home');
-    }
-  }
-
-  void _onNavTapped(int index) async {
-    setState(() => _currentNavIndex = index);
-    String action = _navItemsList[index];
-    if (action == 'home') _controller.loadRequest(Uri.parse(AppConfig.targetUrl));
-    if (action == 'back' && await _controller.canGoBack()) _controller.goBack();
-    if (action == 'forward' && await _controller.canGoForward()) _controller.goForward();
-    if (action == 'reload') _controller.reload();
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget bodyContent = Stack(
-      children: [
-        WebViewWidget(controller: _controller),
-        if (_isLoading)
-          LinearProgressIndicator(color: AppConfig.primaryColor, backgroundColor: Colors.transparent),
-      ],
-    );
-
-    if (AppConfig.enablePullToRefresh) {
-      bodyContent = RefreshIndicator(
-        color: AppConfig.primaryColor,
-        onRefresh: () async => _controller.reload(),
-        child: bodyContent,
-      );
-    }
+    final primaryColor = parseColor(AppConfig.themeColor);
 
     return WillPopScope(
       onWillPop: () async {
@@ -202,59 +152,70 @@ class _MainWebScreenState extends State<MainWebScreen> {
       child: Scaffold(
         appBar: AppConfig.showAppBar
             ? AppBar(
-                title: Text(AppConfig.appName),
+                title: Text(AppConfig.appName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 1,
                 actions: [
-                  IconButton(icon: const Icon(Icons.refresh), onPressed: () => _controller.reload()),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () => _controller.reload(),
+                  ),
                 ],
               )
             : null,
-        drawer: AppConfig.showDrawer
-            ? Drawer(
-                child: ListView(
-                  children: [
-                    DrawerHeader(
-                      decoration: BoxDecoration(color: AppConfig.primaryColor),
-                      child: Center(
-                        child: Text(AppConfig.appName, style: const TextStyle(color: Colors.white, fontSize: 20)),
-                      ),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.home),
-                      title: const Text('Home'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _controller.loadRequest(Uri.parse(AppConfig.targetUrl));
-                      },
-                    ),
-                  ],
-                ),
-              )
-            : null,
-        body: SafeArea(child: bodyContent),
-        floatingActionButton: AppConfig.showFab
-            ? FloatingActionButton(
-                backgroundColor: AppConfig.primaryColor,
-                onPressed: () async {
-                  if (AppConfig.fabActionUrl.isNotEmpty) {
-                    final uri = Uri.parse(AppConfig.fabActionUrl);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  } else {
-                    _controller.reload();
-                  }
-                },
-                child: Icon(_getFabIcon(), color: Colors.white),
-              )
-            : null,
-        bottomNavigationBar: (AppConfig.showBottomNav && _navItemsList.isNotEmpty)
+        body: Stack(
+          children: [
+            AppConfig.enableRefresh
+                ? RefreshIndicator(
+                    onRefresh: () async => _controller.reload(),
+                    child: WebViewWidget(controller: _controller),
+                  )
+                : WebViewWidget(controller: _controller),
+            if (_isLoading)
+              LinearProgressIndicator(color: primaryColor, backgroundColor: Colors.transparent),
+          ],
+        ),
+        bottomNavigationBar: AppConfig.showBottomNav
             ? BottomNavigationBar(
-                currentIndex: _currentNavIndex >= _navItemsList.length ? 0 : _currentNavIndex,
-                selectedItemColor: AppConfig.primaryColor,
+                currentIndex: 0,
+                selectedItemColor: primaryColor,
                 unselectedItemColor: Colors.grey,
                 type: BottomNavigationBarType.fixed,
-                onTap: _onNavTapped,
-                items: _navItemsList.map((type) => _buildNavItem(type)).toList(),
+                onTap: (index) async {
+                  switch (index) {
+                    case 0:
+                      _controller.loadRequest(Uri.parse(AppConfig.targetUrl));
+                      break;
+                    case 1:
+                      if (await _controller.canGoBack()) _controller.goBack();
+                      break;
+                    case 2:
+                      if (await _controller.canGoForward()) _controller.goForward();
+                      break;
+                    case 3:
+                      _controller.reload();
+                      break;
+                    case 4:
+                      Share.share("Check out ${AppConfig.appName}: ${AppConfig.targetUrl}");
+                      break;
+                  }
+                },
+                items: const [
+                  BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+                  BottomNavigationBarItem(icon: Icon(Icons.arrow_back), label: 'Back'),
+                  BottomNavigationBarItem(icon: Icon(Icons.arrow_forward), label: 'Forward'),
+                  BottomNavigationBarItem(icon: Icon(Icons.refresh), label: 'Reload'),
+                  BottomNavigationBarItem(icon: Icon(Icons.share), label: 'Share'),
+                ],
+              )
+            : null,
+        floatingActionButton: AppConfig.showFab
+            ? FloatingActionButton(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                onPressed: _triggerFabAction,
+                child: const Icon(Icons.chat),
               )
             : null,
       ),
