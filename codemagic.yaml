@@ -8,40 +8,104 @@ workflows:
       groups:
         - app_vars
     scripts:
-      - name: Inject Selected Permissions Only
-        script: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if [ -f "$MANIFEST" ]; then
-            PERMS=""
-            [ "$REQ_CAMERA" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.CAMERA\"/>"
-            [ "$REQ_LOCATION" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>"
-            [ "$REQ_STORAGE" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>\n    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
-            [ "$REQ_MIC" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>"
-            [ "$REQ_NOTIFICATIONS" = "true" ] && PERMS="$PERMS\n    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
-            
-            sed -i "s|<!-- DYNAMIC_PERMISSIONS_PLACEHOLDER -->|$PERMS|g" "$MANIFEST" || true
-          fi
-
-      - name: Fetch Dependencies
+      - name: Get Flutter Packages
         script: |
           flutter packages get
 
-      - name: Build APK with Dynamic Controls
+      - name: Inject Dynamic App Name, Permissions & Config
         script: |
-          flutter build apk --release \
-            --dart-define=APP_NAME="${CUSTOM_APP_NAME:-Web to App}" \
-            --dart-define=TARGET_URL="${CUSTOM_TARGET_URL:-https://google.com}" \
-            --dart-define=THEME_COLOR="${CUSTOM_THEME_COLOR:-3b49df}" \
-            --dart-define=SPLASH_BG_COLOR="${CUSTOM_SPLASH_BG:-ffffff}" \
-            --dart-define=SPLASH_DURATION="${CUSTOM_SPLASH_DURATION:-2}" \
-            --dart-define=ENABLE_ZOOM="${CUSTOM_ENABLE_ZOOM:-true}" \
-            --dart-define=ENABLE_PULL_TO_REFRESH="${CUSTOM_ENABLE_REFRESH:-true}" \
-            --dart-define=SHOW_APPBAR="${CUSTOM_SHOW_APPBAR:-false}" \
-            --dart-define=SHOW_DRAWER="${CUSTOM_SHOW_DRAWER:-false}" \
-            --dart-define=SHOW_BOTTOM_NAV="${CUSTOM_SHOW_BOTTOM_NAV:-false}" \
-            --dart-define=BOTTOM_NAV_ITEMS="${CUSTOM_BOTTOM_NAV_ITEMS:-home,back,forward,reload}" \
-            --dart-define=SHOW_FAB="${CUSTOM_SHOW_FAB:-false}" \
-            --dart-define=FAB_ACTION_URL="${CUSTOM_FAB_URL:-}" \
-            --dart-define=FAB_ICON_TYPE="${CUSTOM_FAB_ICON:-chat}"
+          python3 - << 'EOF'
+          import os, re
+
+          app_name = os.environ.get('CUSTOM_APP_NAME', 'WebToApp')
+          target_url = os.environ.get('CUSTOM_TARGET_URL', 'https://example.com')
+          theme_color = os.environ.get('CUSTOM_THEME_COLOR', '#4F46E5')
+          splash_bg = os.environ.get('CUSTOM_SPLASH_BG', '#1E1B4B')
+          splash_duration = os.environ.get('CUSTOM_SPLASH_DURATION', '2')
+          show_appbar = os.environ.get('CUSTOM_SHOW_APPBAR', 'true')
+          show_drawer = os.environ.get('CUSTOM_SHOW_DRAWER', 'false')
+          show_bottom_nav = os.environ.get('CUSTOM_SHOW_BOTTOM_NAV', 'true')
+          bottom_nav_items = os.environ.get('CUSTOM_BOTTOM_NAV_ITEMS', 'home,back,forward,reload,share')
+          show_fab = os.environ.get('CUSTOM_SHOW_FAB', 'false')
+          fab_url = os.environ.get('CUSTOM_FAB_URL', '')
+          fab_icon = os.environ.get('CUSTOM_FAB_ICON', 'whatsapp')
+          enable_zoom = os.environ.get('CUSTOM_ENABLE_ZOOM', 'true')
+          enable_refresh = os.environ.get('CUSTOM_ENABLE_REFRESH', 'true')
+          req_camera = os.environ.get('REQ_CAMERA', 'false')
+          req_location = os.environ.get('REQ_LOCATION', 'false')
+          req_storage = os.environ.get('REQ_STORAGE', 'true')
+          req_mic = os.environ.get('REQ_MIC', 'false')
+
+          # 1. Update AndroidManifest.xml safely
+          manifest_path = "android/app/src/main/AndroidManifest.xml"
+          if os.path.exists(manifest_path):
+              with open(manifest_path, "r", encoding="utf-8") as f:
+                  content = f.read()
+
+              # Update app label
+              content = re.sub(r'android:label="[^"]*"', f'android:label="{app_name}"', content)
+
+              # Build permissions
+              perms = [
+                  '<uses-permission android:name="android.permission.INTERNET"/>',
+                  '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
+              ]
+              if req_camera.lower() == 'true':
+                  perms.append('<uses-permission android:name="android.permission.CAMERA"/>')
+              if req_location.lower() == 'true':
+                  perms.append('<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>')
+                  perms.append('<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>')
+              if req_storage.lower() == 'true':
+                  perms.append('<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>')
+                  perms.append('<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>')
+              if req_mic.lower() == 'true':
+                  perms.append('<uses-permission android:name="android.permission.RECORD_AUDIO"/>')
+
+              perms_str = "\n    " + "\n    ".join(perms) + "\n"
+              if "<!-- DYNAMIC PERMISSIONS PLACEHOLDER -->" in content:
+                  content = content.replace("<!-- DYNAMIC PERMISSIONS PLACEHOLDER -->", perms_str)
+              else:
+                  content = content.replace("</manifest>", f"{perms_str}</manifest>")
+
+              with open(manifest_path, "w", encoding="utf-8") as f:
+                  f.write(content)
+              print("AndroidManifest.xml updated with custom app name and permissions!")
+
+          # 2. Write lib/app_config.dart
+          os.makedirs("lib", exist_ok=True)
+          with open("lib/app_config.dart", "w", encoding="utf-8") as f:
+              f.write(f'''// Generated automatically by Codemagic build
+class AppConfig {{
+  static const String appName = "{app_name}";
+  static const String targetUrl = "{target_url}";
+  static const String themeColor = "{theme_color}";
+  static const String splashBg = "{splash_bg}";
+  static const int splashDuration = {int(splash_duration) if splash_duration.isdigit() else 2};
+  static const bool showAppBar = {str(show_appbar.lower() == 'true').lower()};
+  static const bool showDrawer = {str(show_drawer.lower() == 'true').lower()};
+  static const bool showBottomNav = {str(show_bottom_nav.lower() == 'true').lower()};
+  static const List<String> bottomNavItems = [{", ".join(f'"{x.strip()}"' for x in bottom_nav_items.split(','))}];
+  static const bool showFab = {str(show_fab.lower() == 'true').lower()};
+  static const String fabUrl = "{fab_url}";
+  static const String fabIcon = "{fab_icon}";
+  static const bool enableZoom = {str(enable_zoom.lower() == 'true').lower()};
+  static const bool enableRefresh = {str(enable_refresh.lower() == 'true').lower()};
+}}
+''')
+          print("lib/app_config.dart generated successfully!")
+          EOF
+
+      - name: Build Android Release APK
+        script: |
+          flutter build apk --release --no-shrink
+
     artifacts:
       - build/**/outputs/**/*.apk
+      - build/**/outputs/**/mapping.txt
+    publishing:
+      email:
+        recipients:
+          - danieljoseph9065@gmail.com
+        notify:
+          on_build_failure: true
+          on_build_success: true
