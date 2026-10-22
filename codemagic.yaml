@@ -1,6 +1,6 @@
 workflows:
   android-release:
-    name: Build Android APK
+    name: Build Android APK and AAB Bundle
     max_build_duration: 30
     instance_type: mac_mini_m2
     environment:
@@ -33,19 +33,20 @@ workflows:
         script: |
           set -e
           mkdir -p lib
-          python3 -c "import os; g=lambda k,d: os.environ.get(k,d); f=open('lib/app_config.dart','w'); f.write('class AppConfig {\n  static const String appName = \"'+g('CUSTOM_APP_NAME','WebToApp')+'\";\n  static const String targetUrl = \"'+g('CUSTOM_TARGET_URL','https://flutter.dev')+'\";\n  static const String themeColor = \"'+g('CUSTOM_THEME_COLOR','#4F46E5')+'\";\n  static const String splashBg = \"'+g('CUSTOM_SPLASH_BG','#1E1B4B')+'\";\n  static const int splashDuration = '+g('CUSTOM_SPLASH_DURATION','2')+';\n  static const bool showAppBar = '+('true' if g('CUSTOM_SHOW_APPBAR','true').lower()=='true' else 'false')+';\n  static const bool showDrawer = '+('true' if g('CUSTOM_SHOW_DRAWER','false').lower()=='true' else 'false')+';\n  static const bool showBottomNav = '+('true' if g('CUSTOM_SHOW_BOTTOM_NAV','true').lower()=='true' else 'false')+';\n  static const String bottomNavItems = \"'+g('CUSTOM_BOTTOM_NAV_ITEMS','home,back,forward,reload,share')+'\";\n  static const bool showFab = '+('true' if g('CUSTOM_SHOW_FAB','false').lower()=='true' else 'false')+';\n  static const String fabUrl = \"'+g('CUSTOM_FAB_URL','')+'\";\n  static const String fabIcon = \"'+g('CUSTOM_FAB_ICON','chat')+'\";\n  static const bool enableZoom = '+('true' if g('CUSTOM_ENABLE_ZOOM','true').lower()=='true' else 'false')+';\n  static const bool enableRefresh = '+('true' if g('CUSTOM_ENABLE_REFRESH','true').lower()=='true' else 'false')+';\n  static const bool reqCamera = '+('true' if g('REQ_CAMERA','false').lower()=='true' else 'false')+';\n  static const bool reqLocation = '+('true' if g('REQ_LOCATION','false').lower()=='true' else 'false')+';\n  static const bool reqStorage = '+('true' if g('REQ_STORAGE','false').lower()=='true' else 'false')+';\n  static const bool reqMic = '+('true' if g('REQ_MIC','false').lower()=='true' else 'false')+';\n}\n'); f.close()"
-          echo "Generated lib/app_config.dart successfully:"
-          cat lib/app_config.dart
+          python3 -c "import os; g=lambda k,d: os.environ.get(k,d); f=open('lib/app_config.dart','w'); f.write('class AppConfig {\n  static const String appName = \"'+g('CUSTOM_APP_NAME','WebToApp')+'\";\n  static const String targetUrl = \"'+g('CUSTOM_TARGET_URL','https://flutter.dev')+'\";\n  static const String themeColor = \"'+g('CUSTOM_THEME_COLOR','#4F46E5')+'\";\n  static const String splashBg = \"'+g('CUSTOM_SPLASH_BG','#1E1B4B')+'\";\n  static const int splashDuration = '+g('CUSTOM_SPLASH_DURATION','2')+';\n  static const bool showAppBar = '+('true' if g('CUSTOM_SHOW_APPBAR','true').lower()=='true' else 'false')+';\n  static const bool showDrawer = '+('true' if g('CUSTOM_SHOW_DRAWER','false').lower()=='true' else 'false')+';\n  static const bool showBottomNav = '+('true' if g('CUSTOM_SHOW_BOTTOM_NAV','true').lower()=='true' else 'false')+';\n  static const String bottomNavItems = \"'+g('CUSTOM_BOTTOM_NAV_ITEMS','home,back,forward,reload,share')+'\";\n  static const bool showFab = '+('true' if g('CUSTOM_SHOW_FAB','false').lower()=='true' else 'false')+';\n  static const String fabUrl = \"'+g('CUSTOM_FAB_URL','')+'\";\n  static const String fabIcon = \"'+g('CUSTOM_FAB_ICON','chat')+'\";\n  static const bool enableZoom = '+('true' if g('CUSTOM_ENABLE_ZOOM','true').lower()=='true' else 'false')+';\n  static const bool enableRefresh = '+('true' if g('CUSTOM_ENABLE_REFRESH','true').lower()=='true' else 'false')+';\n  static const bool reqCamera = '+('true' if g('REQ_CAMERA','false').lower()=='true' else 'false')+';\n  static const bool reqLocation = '+('true' if g('REQ_LOCATION','false').lower()=='true' else 'false')+';\n  static const bool reqStorage = '+('true' if g('REQ_STORAGE','false').lower()=='true' else 'false')+';\n  static const bool reqMic = '+('true' if g('REQ_MIC','false').lower()=='true' else 'false')+';\n  static const String adNetwork = \"'+g('REQ_AD_NETWORK','none')+'\";\n  static const String unityGameId = \"'+g('REQ_UNITY_GAME_ID','')+'\";\n  static const String unityBanner = \"'+g('REQ_UNITY_BANNER','Banner_Android')+'\";\n  static const String unityInterstitial = \"'+g('REQ_UNITY_INTERSTITIAL','Interstitial_Android')+'\";\n  static const bool unityTestMode = '+('true' if g('REQ_UNITY_TEST_MODE','true').lower()=='true' else 'false')+';\n}\n'); f.close()"
+          echo "Generated lib/app_config.dart successfully"
 
       - name: Get Flutter dependencies
         script: |
           flutter packages get
 
-      - name: Build Android Release APK
+      - name: Build Android Release APK and AAB Bundle
         script: |
           flutter build apk --release --no-tree-shake-icons
+          flutter build appbundle --release --no-tree-shake-icons
 
     artifacts:
       - build/**/outputs/**/*.apk
+      - build/**/outputs/**/*.aab
       - build/**/outputs/**/mapping.txt
       - flutter_drive.log
