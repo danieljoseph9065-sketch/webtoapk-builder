@@ -2,7 +2,7 @@ workflows:
   android-release:
     name: Build Android APK
     max_build_duration: 30
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     environment:
       flutter: stable
       groups:
@@ -27,11 +27,9 @@ workflows:
             cp /tmp/AndroidManifest.xml.bak android/app/src/main/AndroidManifest.xml
           fi
 
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i "s/minSdkVersion 16/minSdkVersion 21/g" android/app/build.gradle || true
-          fi
-
-          sed -i "s/android:label=\".*\"/android:label=\"${CUSTOM_APP_NAME:-WebToApp}\"/g" android/app/src/main/AndroidManifest.xml || true
+          python3 -c "import os; p='android/app/build.gradle'; open(p,'w').write(open(p).read().replace('minSdkVersion 16','minSdkVersion 21')) if os.path.exists(p) else None"
+          python3 -c "import os, re; p='android/app/src/main/AndroidManifest.xml'; open(p,'w').write(re.sub(r'\s+package=\"[^\"]*\"', '', open(p).read())) if os.path.exists(p) else None"
+          python3 -c "import os, re; p='android/app/src/main/AndroidManifest.xml'; open(p,'w').write(re.sub(r'android:label=\"[^\"]*\"', f'android:label=\"{os.environ.get(\"CUSTOM_APP_NAME\", \"WebToApp\")}\"', open(p).read())) if os.path.exists(p) else None"
 
       - name: Generate App Config
         script: |
