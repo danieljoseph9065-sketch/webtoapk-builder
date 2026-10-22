@@ -27,9 +27,7 @@ workflows:
             cp /tmp/AndroidManifest.xml.bak android/app/src/main/AndroidManifest.xml
           fi
 
-          python3 -c "import os; p='android/app/build.gradle'; open(p,'w').write(open(p).read().replace('minSdkVersion 16','minSdkVersion 21')) if os.path.exists(p) else None"
-          python3 -c "import os, re; p='android/app/src/main/AndroidManifest.xml'; open(p,'w').write(re.sub(r'\s+package=\"[^\"]*\"', '', open(p).read())) if os.path.exists(p) else None"
-          python3 -c "import os, re; p='android/app/src/main/AndroidManifest.xml'; open(p,'w').write(re.sub(r'android:label=\"[^\"]*\"', f'android:label=\"{os.environ.get(\"CUSTOM_APP_NAME\", \"WebToApp\")}\"', open(p).read())) if os.path.exists(p) else None"
+          python3 -c "import os, re; p='android/app/src/main/AndroidManifest.xml'; data=open(p).read() if os.path.exists(p) else ''; data=re.sub(r'\s+package=\"[^\"]*\"', '', data); n=os.environ.get('CUSTOM_APP_NAME','WebToApp'); data=re.sub(r'android:label=\"[^\"]*\"', 'android:label=\"'+n+'\"', data); open(p,'w').write(data) if data else None"
 
       - name: Generate App Config
         script: |
