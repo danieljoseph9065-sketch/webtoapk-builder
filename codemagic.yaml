@@ -1,7 +1,7 @@
 workflows:
   android-release:
-    name: WebToApp Android Release & AAB Build
-    max_build_duration: 60
+    name: Build Android APK and AAB Bundle
+    max_build_duration: 30
     instance_type: mac_mini_m2
     environment:
       flutter: stable
@@ -9,118 +9,49 @@ workflows:
       vars:
         CUSTOM_APP_NAME: "WebToApp"
         CUSTOM_TARGET_URL: "https://flutter.dev"
+        CUSTOM_PACKAGE_NAME: "com.user.webtoapp"
         CUSTOM_THEME_COLOR: "#4F46E5"
         CUSTOM_SPLASH_BG: "#1E1B4B"
         CUSTOM_SPLASH_DURATION: "2"
         CUSTOM_SPLASH_DESIGN: "circle_pulse"
         CUSTOM_LAYOUT_DESIGN: "bottom_nav"
-        CUSTOM_NO_INTERNET_FORMAT: "friendly_illustration"
+        CUSTOM_NO_INTERNET_FORMAT: "illustration"
         CUSTOM_SHOW_APPBAR: "true"
         CUSTOM_SHOW_DRAWER: "false"
         CUSTOM_DRAWER_SUBTITLE: "Official Mobile App"
         CUSTOM_DRAWER_ITEMS_COUNT: "4"
-        CUSTOM_DRAWER_ITEMS_DATA: "Home|home|;;Products|shop|;;About Us|info|;;Contact Support|chat|"
+        CUSTOM_DRAWER_ITEMS_DATA: "Home|home|https://flutter.dev;;Products|shop|https://flutter.dev;;Offers|offer|https://flutter.dev;;Support|chat|https://flutter.dev"
         CUSTOM_SHOW_BOTTOM_NAV: "true"
         CUSTOM_BOTTOM_NAV_ITEMS: "home,back,forward,reload,share"
         CUSTOM_BOTTOM_BUTTONS_COUNT: "4"
-        CUSTOM_BOTTOM_BUTTONS_DATA: "Home|home|;;Shop|shop|;;Offers|offer|;;Support|chat|"
+        CUSTOM_BOTTOM_BUTTONS_DATA: "Home|home|https://flutter.dev;;Shop|shop|https://flutter.dev;;Offers|offer|https://flutter.dev;;Support|chat|https://flutter.dev"
         CUSTOM_SHOW_FAB: "false"
         CUSTOM_FAB_ACTION_TYPE: "whatsapp"
-        CUSTOM_FAB_PHONE: ""
+        CUSTOM_FAB_PHONE: "none"
         CUSTOM_FAB_TITLE: "Support"
-        CUSTOM_FAB_URL: ""
+        CUSTOM_FAB_URL: "none"
         CUSTOM_FAB_ICON: "whatsapp"
         CUSTOM_ENABLE_ZOOM: "true"
         CUSTOM_ENABLE_REFRESH: "true"
         REQ_CAMERA: "false"
         REQ_LOCATION: "false"
-        REQ_STORAGE: "true"
+        REQ_STORAGE: "false"
         REQ_MIC: "false"
         REQ_AD_NETWORK: "none"
-        REQ_ADMOB_BANNER: ""
-        REQ_ADMOB_INTERSTITIAL: ""
-        REQ_UNITY_GAME_ID: ""
+        REQ_ADMOB_BANNER: "none"
+        REQ_ADMOB_INTERSTITIAL: "none"
+        REQ_UNITY_GAME_ID: "none"
         REQ_UNITY_BANNER: "Banner_Android"
         REQ_UNITY_INTERSTITIAL: "Interstitial_Android"
         REQ_UNITY_TEST_MODE: "true"
-
+        CUSTOM_APP_LOGO_URL: "none"
+        CUSTOM_APP_LOGO_PRESET: "globe"
     scripts:
-      - name: Set up local.properties
-        script: |
-          echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
-
-      - name: Update Android App Name in AndroidManifest.xml
-        script: |
-          set -e
-          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-            python3 -c '
-          import os, re
-          manifest_path = "android/app/src/main/AndroidManifest.xml"
-          app_name = os.environ.get("CUSTOM_APP_NAME", "WebToApp").replace("\"", "").replace("&", "and")
-          with open(manifest_path, "r", encoding="utf-8") as f:
-              content = f.read()
-          content = re.sub(r"android:label=\"[^\"]*\"", f"android:label=\"{app_name}\"", content)
-          with open(manifest_path, "w", encoding="utf-8") as f:
-              f.write(content)
-          '
-          fi
-
-      - name: Generate App Config (lib/app_config.dart)
+      - name: Generate App Config
         script: |
           set -e
           mkdir -p lib
-          python3 -c '
-          import os, json
-
-          def g(k, d=""):
-              return os.environ.get(k, d)
-
-          def b(k, d="false"):
-              return "true" if os.environ.get(k, d).lower() == "true" else "false"
-
-          lines = [
-              "class AppConfig {",
-              f"  static const String appName = {json.dumps(g(\"CUSTOM_APP_NAME\", \"WebToApp\"))};",
-              f"  static const String targetUrl = {json.dumps(g(\"CUSTOM_TARGET_URL\", \"https://flutter.dev\"))};",
-              f"  static const String themeColor = {json.dumps(g(\"CUSTOM_THEME_COLOR\", \"#4F46E5\"))};",
-              f"  static const String splashBg = {json.dumps(g(\"CUSTOM_SPLASH_BG\", \"#1E1B4B\"))};",
-              f"  static const int splashDuration = {int(g(\"CUSTOM_SPLASH_DURATION\", \"2\") or 2)};",
-              f"  static const String splashDesign = {json.dumps(g(\"CUSTOM_SPLASH_DESIGN\", \"circle_pulse\"))};",
-              f"  static const String layoutDesign = {json.dumps(g(\"CUSTOM_LAYOUT_DESIGN\", \"bottom_nav\"))};",
-              f"  static const String noInternetFormat = {json.dumps(g(\"CUSTOM_NO_INTERNET_FORMAT\", \"friendly_illustration\"))};",
-              f"  static const bool showAppBar = {b(\"CUSTOM_SHOW_APPBAR\", \"true\")};",
-              f"  static const bool showDrawer = {b(\"CUSTOM_SHOW_DRAWER\", \"false\")};",
-              f"  static const String drawerSubtitle = {json.dumps(g(\"CUSTOM_DRAWER_SUBTITLE\", \"Official Mobile App\"))};",
-              f"  static const int drawerItemsCount = {int(g(\"CUSTOM_DRAWER_ITEMS_COUNT\", \"4\") or 4)};",
-              f"  static const String drawerItemsData = {json.dumps(g(\"CUSTOM_DRAWER_ITEMS_DATA\", \"Home|home|;;Products|shop|;;About Us|info|;;Contact Support|chat|\"))};",
-              f"  static const bool showBottomNav = {b(\"CUSTOM_SHOW_BOTTOM_NAV\", \"true\")};",
-              f"  static const String bottomNavItems = {json.dumps(g(\"CUSTOM_BOTTOM_NAV_ITEMS\", \"home,back,forward,reload,share\"))};",
-              f"  static const int bottomButtonsCount = {int(g(\"CUSTOM_BOTTOM_BUTTONS_COUNT\", \"4\") or 4)};",
-              f"  static const String bottomButtonsData = {json.dumps(g(\"CUSTOM_BOTTOM_BUTTONS_DATA\", \"Home|home|;;Shop|shop|;;Offers|offer|;;Support|chat|\"))};",
-              f"  static const bool showFab = {b(\"CUSTOM_SHOW_FAB\", \"false\")};",
-              f"  static const String fabActionType = {json.dumps(g(\"CUSTOM_FAB_ACTION_TYPE\", \"whatsapp\"))};",
-              f"  static const String fabPhone = {json.dumps(g(\"CUSTOM_FAB_PHONE\", \"\"))};",
-              f"  static const String fabTitle = {json.dumps(g(\"CUSTOM_FAB_TITLE\", \"Support\"))};",
-              f"  static const String fabUrl = {json.dumps(g(\"CUSTOM_FAB_URL\", \"\"))};",
-              f"  static const String fabIcon = {json.dumps(g(\"CUSTOM_FAB_ICON\", \"whatsapp\"))};",
-              f"  static const bool enableZoom = {b(\"CUSTOM_ENABLE_ZOOM\", \"true\")};",
-              f"  static const bool enableRefresh = {b(\"CUSTOM_ENABLE_REFRESH\", \"true\")};",
-              f"  static const bool reqCamera = {b(\"REQ_CAMERA\", \"false\")};",
-              f"  static const bool reqLocation = {b(\"REQ_LOCATION\", \"false\")};",
-              f"  static const bool reqStorage = {b(\"REQ_STORAGE\", \"true\")};",
-              f"  static const bool reqMic = {b(\"REQ_MIC\", \"false\")};",
-              f"  static const String adNetwork = {json.dumps(g(\"REQ_AD_NETWORK\", \"none\"))};",
-              f"  static const String unityGameId = {json.dumps(g(\"REQ_UNITY_GAME_ID\", \"\"))};",
-              f"  static const String unityBanner = {json.dumps(g(\"REQ_UNITY_BANNER\", \"Banner_Android\"))};",
-              f"  static const String unityInterstitial = {json.dumps(g(\"REQ_UNITY_INTERSTITIAL\", \"Interstitial_Android\"))};",
-              f"  static const bool unityTestMode = {b(\"REQ_UNITY_TEST_MODE\", \"true\")};",
-              "}"
-          ]
-
-          with open("lib/app_config.dart", "w", encoding="utf-8") as f:
-              f.write("\n".join(lines) + "\n")
-          '
-          cat lib/app_config.dart
+          python3 -c "import os; g=lambda k,d: ('' if os.environ.get(k,d)=='none' else os.environ.get(k,d)); f=open('lib/app_config.dart','w'); f.write('class AppConfig {\n  static const String appName = \"'+g('CUSTOM_APP_NAME','WebToApp')+'\";\n  static const String targetUrl = \"'+g('CUSTOM_TARGET_URL','https://flutter.dev')+'\";\n  static const String themeColor = \"'+g('CUSTOM_THEME_COLOR','#4F46E5')+'\";\n  static const String splashBg = \"'+g('CUSTOM_SPLASH_BG','#1E1B4B')+'\";\n  static const int splashDuration = '+g('CUSTOM_SPLASH_DURATION','2')+';\n  static const String splashDesign = \"'+g('CUSTOM_SPLASH_DESIGN','circle_pulse')+'\";\n  static const String layoutDesign = \"'+g('CUSTOM_LAYOUT_DESIGN','bottom_nav')+'\";\n  static const String noInternetFormat = \"'+g('CUSTOM_NO_INTERNET_FORMAT','illustration')+'\";\n  static const bool showAppBar = '+('true' if g('CUSTOM_SHOW_APPBAR','true').lower()=='true' else 'false')+';\n  static const bool showDrawer = '+('true' if g('CUSTOM_SHOW_DRAWER','false').lower()=='true' else 'false')+';\n  static const String drawerSubtitle = \"'+g('CUSTOM_DRAWER_SUBTITLE','Official Mobile App')+'\";\n  static const int drawerItemsCount = '+g('CUSTOM_DRAWER_ITEMS_COUNT','4')+';\n  static const String drawerItemsData = \"'+g('CUSTOM_DRAWER_ITEMS_DATA','')+'\";\n  static const bool showBottomNav = '+('true' if g('CUSTOM_SHOW_BOTTOM_NAV','true').lower()=='true' else 'false')+';\n  static const String bottomNavItems = \"'+g('CUSTOM_BOTTOM_NAV_ITEMS','home,back,forward,reload,share')+'\";\n  static const int bottomButtonsCount = '+g('CUSTOM_BOTTOM_BUTTONS_COUNT','4')+';\n  static const String bottomButtonsData = \"'+g('CUSTOM_BOTTOM_BUTTONS_DATA','')+'\";\n  static const bool showFab = '+('true' if g('CUSTOM_SHOW_FAB','false').lower()=='true' else 'false')+';\n  static const String fabActionType = \"'+g('CUSTOM_FAB_ACTION_TYPE','whatsapp')+'\";\n  static const String fabPhone = \"'+g('CUSTOM_FAB_PHONE','')+'\";\n  static const String fabTitle = \"'+g('CUSTOM_FAB_TITLE','Support')+'\";\n  static const String fabUrl = \"'+g('CUSTOM_FAB_URL','')+'\";\n  static const String fabIcon = \"'+g('CUSTOM_FAB_ICON','whatsapp')+'\";\n  static const bool enableZoom = '+('true' if g('CUSTOM_ENABLE_ZOOM','true').lower()=='true' else 'false')+';\n  static const bool enableRefresh = '+('true' if g('CUSTOM_ENABLE_REFRESH','true').lower()=='true' else 'false')+';\n  static const bool reqCamera = '+('true' if g('REQ_CAMERA','false').lower()=='true' else 'false')+';\n  static const bool reqLocation = '+('true' if g('REQ_LOCATION','false').lower()=='true' else 'false')+';\n  static const bool reqStorage = '+('true' if g('REQ_STORAGE','false').lower()=='true' else 'false')+';\n  static const bool reqMic = '+('true' if g('REQ_MIC','false').lower()=='true' else 'false')+';\n}\n'); f.close()"
 
       - name: Get Flutter dependencies
         script: |
