@@ -17,6 +17,9 @@ workflows:
         CUSTOM_NO_INTERNET_FORMAT: "friendly_illustration"
         CUSTOM_SHOW_APPBAR: "true"
         CUSTOM_SHOW_DRAWER: "false"
+        CUSTOM_DRAWER_SUBTITLE: "Official Mobile App"
+        CUSTOM_DRAWER_ITEMS_COUNT: "4"
+        CUSTOM_DRAWER_ITEMS_DATA: "Home|home|;;Products|shop|;;About Us|info|;;Contact Support|chat|"
         CUSTOM_SHOW_BOTTOM_NAV: "true"
         CUSTOM_BOTTOM_NAV_ITEMS: "home,back,forward,reload,share"
         CUSTOM_BOTTOM_BUTTONS_COUNT: "4"
@@ -87,6 +90,9 @@ workflows:
               f"  static const String noInternetFormat = {json.dumps(g(\"CUSTOM_NO_INTERNET_FORMAT\", \"friendly_illustration\"))};",
               f"  static const bool showAppBar = {b(\"CUSTOM_SHOW_APPBAR\", \"true\")};",
               f"  static const bool showDrawer = {b(\"CUSTOM_SHOW_DRAWER\", \"false\")};",
+              f"  static const String drawerSubtitle = {json.dumps(g(\"CUSTOM_DRAWER_SUBTITLE\", \"Official Mobile App\"))};",
+              f"  static const int drawerItemsCount = {int(g(\"CUSTOM_DRAWER_ITEMS_COUNT\", \"4\") or 4)};",
+              f"  static const String drawerItemsData = {json.dumps(g(\"CUSTOM_DRAWER_ITEMS_DATA\", \"Home|home|;;Products|shop|;;About Us|info|;;Contact Support|chat|\"))};",
               f"  static const bool showBottomNav = {b(\"CUSTOM_SHOW_BOTTOM_NAV\", \"true\")};",
               f"  static const String bottomNavItems = {json.dumps(g(\"CUSTOM_BOTTOM_NAV_ITEMS\", \"home,back,forward,reload,share\"))};",
               f"  static const int bottomButtonsCount = {int(g(\"CUSTOM_BOTTOM_BUTTONS_COUNT\", \"4\") or 4)};",
