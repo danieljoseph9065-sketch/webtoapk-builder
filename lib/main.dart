@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'app_config.dart';
 
 void main() {
@@ -18,17 +20,16 @@ Color parseHexColor(String hex, Color fallback) {
   }
 }
 
-class BottomTabItem {
+class NavActionItem {
   final String title;
   final String iconKey;
   final String url;
-  BottomTabItem({required this.title, required this.iconKey, required this.url});
+  NavActionItem({required this.title, required this.iconKey, required this.url});
 }
 
-List<BottomTabItem> parseCustomBottomButtons() {
-  final raw = AppConfig.bottomButtonsData.trim();
-  final List<BottomTabItem> items = [];
-  if (raw.isNotEmpty) {
+List<NavActionItem> parsePipeItems(String raw, int count, int minCount, int maxCount) {
+  final List<NavActionItem> items = [];
+  if (raw.trim().isNotEmpty) {
     final parts = raw.split(';;');
     for (final part in parts) {
       if (part.trim().isEmpty) continue;
@@ -36,19 +37,19 @@ List<BottomTabItem> parseCustomBottomButtons() {
       final title = fields.isNotEmpty && fields[0].trim().isNotEmpty ? fields[0].trim() : 'Home';
       final icon = fields.length > 1 && fields[1].trim().isNotEmpty ? fields[1].trim() : 'home';
       final url = fields.length > 2 && fields[2].trim().isNotEmpty ? fields[2].trim() : AppConfig.targetUrl;
-      items.add(BottomTabItem(title: title, iconKey: icon, url: url));
+      items.add(NavActionItem(title: title, iconKey: icon, url: url));
     }
   }
   if (items.isEmpty) {
     items.addAll([
-      BottomTabItem(title: 'Home', iconKey: 'home', url: AppConfig.targetUrl),
-      BottomTabItem(title: 'Shop', iconKey: 'shop', url: AppConfig.targetUrl),
-      BottomTabItem(title: 'Offers', iconKey: 'offer', url: AppConfig.targetUrl),
-      BottomTabItem(title: 'Support', iconKey: 'chat', url: AppConfig.targetUrl),
+      NavActionItem(title: 'Home', iconKey: 'home', url: AppConfig.targetUrl),
+      NavActionItem(title: 'Shop', iconKey: 'shop', url: AppConfig.targetUrl),
+      NavActionItem(title: 'Offers', iconKey: 'offer', url: AppConfig.targetUrl),
+      NavActionItem(title: 'Support', iconKey: 'chat', url: AppConfig.targetUrl),
     ]);
   }
-  final count = AppConfig.bottomButtonsCount.clamp(2, 5);
-  return items.take(count).toList();
+  final safeCount = count.clamp(minCount, maxCount);
+  return items.take(safeCount).toList();
 }
 
 IconData resolveIconData(String key) {
@@ -61,6 +62,8 @@ IconData resolveIconData(String key) {
       return Icons.shopping_cart_rounded;
     case 'offer':
       return Icons.local_offer_rounded;
+    case 'info':
+      return Icons.info_outline_rounded;
     case 'chat':
     case 'whatsapp':
       return Icons.chat_bubble_rounded;
@@ -211,7 +214,8 @@ class MainWebShell extends StatefulWidget {
 
 class _MainWebShellState extends State<MainWebShell> {
   late final WebViewController _controller;
-  late final List<BottomTabItem> _bottomTabs;
+  late final List<NavActionItem> _bottomTabs;
+  late final List<NavActionItem> _drawerItems;
   int _selectedIndex = 0;
   bool _isLoading = true;
   bool _hasError = false;
@@ -235,7 +239,19 @@ class _MainWebShellState extends State<MainWebShell> {
   @override
   void initState() {
     super.initState();
-    _bottomTabs = parseCustomBottomButtons();
+    _bottomTabs = parsePipeItems(
+      AppConfig.bottomButtonsData,
+      AppConfig.bottomButtonsCount,
+      2,
+      5,
+    );
+    _drawerItems = parsePipeItems(
+      AppConfig.drawerItemsData,
+      AppConfig.drawerItemsCount,
+      2,
+      6,
+    );
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..enableZoom(AppConfig.enableZoom)
@@ -246,6 +262,14 @@ class _MainWebShellState extends State<MainWebShell> {
             _hasError = false;
           }),
           onPageFinished: (_) => setState(() => _isLoading = false),
+          onNavigationRequest: (NavigationRequest request) {
+            final uri = Uri.parse(request.url);
+            if (uri.scheme == 'tel' || uri.scheme == 'mailto' || uri.scheme == 'whatsapp') {
+              launchUrl(uri, mode: LaunchMode.externalApplication);
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
           onWebResourceError: (err) {
             if (err.isForMainFrame == true) {
               setState(() {
@@ -268,21 +292,36 @@ class _MainWebShellState extends State<MainWebShell> {
     return trimmed;
   }
 
-  void _onBottomTabTap(int index) {
-    setState(() => _selectedIndex = index);
-    final tab = _bottomTabs[index];
-    if (tab.iconKey.toLowerCase() == 'reload') {
+  void _executeNavAction(NavActionItem item) {
+    final key = item.iconKey.toLowerCase();
+    if (key == 'reload') {
       _controller.reload();
       return;
     }
-    final target = tab.url.trim().isEmpty ? AppConfig.targetUrl : tab.url;
+    if (key == 'share') {
+      Share.share('Check out ${AppConfig.appName}: ${AppConfig.targetUrl}');
+      return;
+    }
+    final target = item.url.trim().isEmpty ? AppConfig.targetUrl : item.url;
     _controller.loadRequest(Uri.parse(_formatUrl(target)));
   }
 
-  void _onFabPressed() {
+  void _onFabPressed() async {
     if (AppConfig.fabActionType == 'whatsapp' && AppConfig.fabPhone.trim().isNotEmpty) {
       final phone = AppConfig.fabPhone.replaceAll(RegExp(r'[^0-9]'), '');
-      _controller.loadRequest(Uri.parse('https://wa.me/$phone'));
+      final waUri = Uri.parse('https://wa.me/$phone');
+      if (await canLaunchUrl(waUri)) {
+        await launchUrl(waUri, mode: LaunchMode.externalApplication);
+      } else {
+        _controller.loadRequest(waUri);
+      }
+    } else if (AppConfig.fabActionType == 'call' && AppConfig.fabPhone.trim().isNotEmpty) {
+      final telUri = Uri.parse('tel:${AppConfig.fabPhone.trim()}');
+      if (await canLaunchUrl(telUri)) {
+        await launchUrl(telUri);
+      }
+    } else if (AppConfig.fabActionType == 'share') {
+      Share.share('Check out ${AppConfig.appName}: ${AppConfig.targetUrl}');
     } else if (AppConfig.fabUrl.trim().isNotEmpty) {
       _controller.loadRequest(Uri.parse(_formatUrl(AppConfig.fabUrl)));
     } else {
@@ -327,28 +366,50 @@ class _MainWebShellState extends State<MainWebShell> {
                       decoration: BoxDecoration(color: themeColor),
                       child: Align(
                         alignment: Alignment.bottomLeft,
-                        child: Text(
-                          AppConfig.appName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              AppConfig.appName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              AppConfig.drawerSubtitle,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    ..._bottomTabs.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final item = entry.value;
-                      return ListTile(
-                        leading: Icon(resolveIconData(item.iconKey), color: themeColor),
-                        title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _onBottomTabTap(i);
+                    Expanded(
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        itemCount: _drawerItems.length,
+                        itemBuilder: (context, index) {
+                          final item = _drawerItems[index];
+                          return ListTile(
+                            leading: Icon(resolveIconData(item.iconKey), color: themeColor),
+                            title: Text(
+                              item.title,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _executeNavAction(item);
+                            },
+                          );
                         },
-                      );
-                    }),
+                      ),
+                    ),
                   ],
                 ),
               )
@@ -418,7 +479,10 @@ class _MainWebShellState extends State<MainWebShell> {
                 selectedItemColor: themeColor,
                 unselectedItemColor: const Color(0xFF64748B),
                 type: BottomNavigationBarType.fixed,
-                onTap: _onBottomTabTap,
+                onTap: (index) {
+                  setState(() => _selectedIndex = index);
+                  _executeNavAction(_bottomTabs[index]);
+                },
                 items: _bottomTabs
                     .map(
                       (btn) => BottomNavigationBarItem(
